@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ヴィンテージ機械式ストップウォッチ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #2a1f0e;
+      background-image: radial-gradient(ellipse at center, #3d2b13 0%, #1a1008 100%);
+    }
+    .vintage-frame {
+      background: radial-gradient(ellipse at 30% 30%, #c8a86b 0%, #9a7b3c 40%, #7a5c20 70%, #5c3f10 100%);
+      box-shadow: 0 0 0 4px #8b6b2a, 0 0 0 8px #5c3f10, 0 8px 32px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,220,120,0.3);
+    }
+    .clock-face {
+      background: radial-gradient(ellipse at 35% 30%, #f5f0e0 0%, #e8dfc0 40%, #d5c898 70%, #c0b070 100%);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3), inset 0 -1px 4px rgba(255,255,220,0.5);
+    }
+    .hand-second { transform-origin: 50% 85%; transition: none; }
+    .hand-minute { transform-origin: 50% 85%; }
+    .display-text {
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .btn-vintage {
+      background: linear-gradient(145deg, #c8a86b, #8b6b2a);
+      border: 2px solid #5c3f10;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,220,120,0.3);
+      transition: all 0.1s ease;
+    }
+    .btn-vintage:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .lap-row:nth-child(even) { background: rgba(0,0,0,0.05); }
+    .lap-best { color: #16a34a; font-weight: bold; }
+    .lap-worst { color: #dc2626; font-weight: bold; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-8 px-4">
+
+  <h1 class="text-amber-200 text-2xl font-bold mb-2 tracking-widest" style="font-family: 'Georgia', serif; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">VINTAGE STOPWATCH</h1>
+  <p class="text-amber-400/60 text-xs mb-8 tracking-widest">機械式懐中時計ストップウォッチ</p>
+
+  <div class="flex flex-col items-center gap-8">
+    <!-- Clock Frame -->
+    <div class="vintage-frame rounded-full p-5" style="width:300px;height:300px;display:flex;align-items:center;justify-content:center;">
+      <div class="clock-face rounded-full" style="width:260px;height:260px;position:relative;">
+
+        <!-- SVG Clock -->
+        <svg id="clockSvg" width="260" height="260" viewBox="0 0 260 260" style="position:absolute;top:0;left:0;">
+          <!-- Hour markers -->
+          <g id="hourMarkers"></g>
+          <!-- Minute markers -->
+          <g id="minuteMarkers"></g>
+
+          <!-- Center decorative ring -->
+          <circle cx="130" cy="130" r="120" fill="none" stroke="#8b6b2a" stroke-width="2" opacity="0.4"/>
+          <circle cx="130" cy="130" r="100" fill="none" stroke="#8b6b2a" stroke-width="0.5" opacity="0.3"/>
+
+          <!-- Minute hand -->
+          <line id="minuteHand"
+            x1="130" y1="130"
+            x2="130" y2="42"
+            stroke="#2a1f0e"
+            stroke-width="3"
+            stroke-linecap="round"
+            style="transform-origin: 130px 130px; transition: transform 0.5s ease;"
+          />
+
+          <!-- Second hand -->
+          <line id="secondHand"
+            x1="130" y1="148"
+            x2="130" y2="30"
+            stroke="#8b1a1a"
+            stroke-width="2"
+            stroke-linecap="round"
+            style="transform-origin: 130px 130px;"
+          />
+
+          <!-- Center jewel -->
+          <circle cx="130" cy="130" r="8" fill="#8b6b2a" stroke="#5c3f10" stroke-width="1"/>
+          <circle cx="130" cy="130" r="4" fill="#c8a86b"/>
+          <circle cx="128" cy="128" r="1.5" fill="rgba(255,255,200,0.7)"/>
+        </svg>
+
+        <!-- Digital display overlay -->
+        <div style="position:absolute;bottom:52px;left:50%;transform:translateX(-50%);text-align:center;">
+          <div id="timeDisplay" class="display-text text-2xl font-bold text-amber-900" style="letter-spacing:2px;">00:00.0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lap display current time -->
+    <div class="text-amber-200/70 text-xs display-text" id="lapCurrentDisplay"></div>
+
+    <!-- Controls -->
+    <div class="flex gap-5">
+      <button id="startStopBtn" onclick="toggleStartStop()"
+        class="btn-vintage text-amber-100 font-bold px-8 py-3 rounded-full text-sm tracking-widest"
+        style="font-family: 'Georgia', serif;">
+        START
+      </button>
+      <button onclick="lapOrReset()"
+        class="btn-vintage text-amber-100 font-bold px-6 py-3 rounded-full text-sm tracking-widest"
+        style="font-family: 'Georgia', serif;" id="lapResetBtn">
+        LAP
+      </button>
+    </div>
+
+    <!-- Lap Times -->
+    <div id="lapsSection" class="w-full max-w-sm">
+      <div id="lapsContainer" class="hidden">
+        <div class="text-amber-300/70 text-xs font-semibold tracking-widest mb-2 text-center">— LAP TIMES —</div>
+        <div class="bg-black/30 rounded-xl overflow-hidden border border-amber-900/40">
+          <div class="grid grid-cols-3 text-xs text-amber-500/70 font-semibold px-4 py-2 border-b border-amber-900/30 tracking-wide">
+            <span>LAP</span>
+            <span class="text-center">ラップ</span>
+            <span class="text-right">累計</span>
+          </div>
+          <div id="lapsList" class="max-h-48 overflow-y-auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Build clock markers
+    function buildClockFace() {
+      const hourMarkers = document.getElementById('hourMarkers');
+      const minuteMarkers = document.getElementById('minuteMarkers');
+      const cx = 130, cy = 130, r = 115;
+
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * 2 * Math.PI - Math.PI / 2;
+        const isHour = i % 5 === 0;
+        const outerR = r;
+        const innerR = isHour ? r - 14 : r - 7;
+        const x1 = cx + outerR * Math.cos(angle);
+        const y1 = cy + outerR * Math.sin(angle);
+        const x2 = cx + innerR * Math.cos(angle);
+        const y2 = cy + innerR * Math.sin(angle);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', isHour ? '#5c3f10' : '#8b6b2a');
+        line.setAttribute('stroke-width', isHour ? '2.5' : '1');
+        line.setAttribute('opacity', isHour ? '0.8' : '0.5');
+
+        if (isHour) {
+          hourMarkers.appendChild(line);
+          // Add number
+          const textR = r - 24;
+          const tx = cx + textR * Math.cos(angle);
+          const ty = cy + textR * Math.sin(angle);
+          const hours = [12,1,2,3,4,5,6,7,8,9,10,11];
+          const hourNum = hours[i / 5];
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', tx);
+          text.setAttribute('y', ty);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dominant-baseline', 'central');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-family', 'Georgia, serif');
+          text.setAttribute('fill', '#5c3f10');
+          text.setAttribute('opacity', '0.8');
+          text.textContent = hourNum;
+          hourMarkers.appendChild(text);
+        } else {
+          minuteMarkers.appendChild(line);
+        }
+      }
+    }
+
+    // Stopwatch state
+    let running = false;
+    let startTime = 0;
+    let elapsed = 0; // ms
+    let lapStart = 0;
+    let laps = [];
+    let animFrame = null;
+
+    // Audio
+    let audioCtx = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+      }
+      return audioCtx;
+    }
+
+    function playBeep(freq, duration, type) {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function playClick() {
+      playBeep(800, 0.05, 'square');
+    }
+
+    function playLapSound() {
+      playBeep(600, 0.08, 'sine');
+      setTimeout(() => playBeep(900, 0.06, 'sine'), 80);
+    }
+
+    function playStartSound() {
+      playBeep(880, 0.1, 'sine');
+      setTimeout(() => playBeep(1100, 0.1, 'sine'), 100);
+    }
+
+    function playStopSound() {
+      playBeep(600, 0.08, 'sine');
+      setTimeout(() => playBeep(400, 0.15, 'sine'), 80);
+    }
+
+    function formatTime(ms, showTenths) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const tenths = Math.floor((ms % 1000) / 100);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      if (showTenths) {
+        return String(minutes).padStart(2,'0') + ':' + String(seconds).padStart(2,'0') + '.' + tenths;
+      }
+      return String(minutes).padStart(2,'0') + ':' + String(seconds).padStart(2,'0');
+    }
+
+    function updateDisplay(ms) {
+      document.getElementById('timeDisplay').textContent = formatTime(ms, true);
+
+      // Second hand: full rotation per 60s
+      const secondAngle = (ms / 1000 % 60) / 60 * 360;
+      document.getElementById('secondHand').style.transform = 'rotate(' + secondAngle + 'deg)';
+
+      // Minute hand: full rotation per 60min
+      const minuteAngle = (ms / 60000 % 60) / 60 * 360;
+      document.getElementById('minuteHand').style.transform = 'rotate(' + minuteAngle + 'deg)';
+    }
+
+    function tick() {
+      if (!running) return;
+      const now = Date.now();
+      elapsed = (now - startTime);
+      updateDisplay(elapsed);
+      animFrame = requestAnimationFrame(tick);
+    }
+
+    function toggleStartStop() {
+      playClick();
+      if (!running) {
+        // Start
+        running = true;
+        startTime = Date.now() - elapsed;
+        lapStart = lapStart || startTime;
+        document.getElementById('startStopBtn').textContent = 'STOP';
+        document.getElementById('lapResetBtn').textContent = 'LAP';
+        playStartSound();
+        animFrame = requestAnimationFrame(tick);
+      } else {
+        // Stop
+        running = false;
+        cancelAnimationFrame(animFrame);
+        document.getElementById('startStopBtn').textContent = 'START';
+        document.getElementById('lapResetBtn').textContent = 'RESET';
+        playStopSound();
+      }
+    }
+
+    function lapOrReset() {
+      playClick();
+      if (running) {
+        // Lap
+        const now = Date.now();
+        const lapTime = now - lapStart;
+        lapStart = now;
+        laps.unshift({ lapNum: laps.length + 1, lapTime: lapTime, total: elapsed });
+        if (laps.length > 20) laps.pop();
+        playLapSound();
+        renderLaps();
+        // Flash lap display
+        const d = document.getElementById('lapCurrentDisplay');
+        d.textContent = 'LAP ' + (laps[0].lapNum) + ': ' + formatTime(lapTime, true);
+        setTimeout(() => { if (!running || laps.length === 0) return; }, 2000);
+      } else {
+        // Reset
+        elapsed = 0;
+        lapStart = 0;
+        laps = [];
+        updateDisplay(0);
+        document.getElementById('lapResetBtn').textContent = 'LAP';
+        document.getElementById('lapCurrentDisplay').textContent = '';
+        renderLaps();
+      }
+    }
+
+    function renderLaps() {
+      const container = document.getElementById('lapsContainer');
+      const list = document.getElementById('lapsList');
+
+      if (laps.length === 0) {
+        container.classList.add('hidden');
+        return;
+      }
+      container.classList.remove('hidden');
+      list.innerHTML = '';
+
+      const lapTimes = laps.map(l => l.lapTime);
+      const minLap = Math.min(...lapTimes);
+      const maxLap = Math.max(...lapTimes);
+
+      laps.forEach(lap => {
+        const row = document.createElement('div');
+        row.className = 'lap-row grid grid-cols-3 text-xs px-4 py-1.5';
+
+        const numCell = document.createElement('span');
+        numCell.textContent = '#' + String(lap.lapNum).padStart(2, '0');
+        numCell.className = 'text-amber-400/70';
+
+        const lapCell = document.createElement('span');
+        lapCell.textContent = formatTime(lap.lapTime, true);
+        lapCell.className = 'text-center display-text ';
+        if (lapTimes.length > 1 && lap.lapTime === minLap) {
+          lapCell.className += 'lap-best';
+        } else if (lapTimes.length > 1 && lap.lapTime === maxLap) {
+          lapCell.className += 'lap-worst';
+        } else {
+          lapCell.className += 'text-amber-200';
+        }
+
+        const totalCell = document.createElement('span');
+        totalCell.textContent = formatTime(lap.total, true);
+        totalCell.className = 'text-right text-amber-400/60 display-text';
+
+        row.appendChild(numCell);
+        row.appendChild(lapCell);
+        row.appendChild(totalCell);
+        list.appendChild(row);
+      });
+    }
+
+    buildClockFace();
+    updateDisplay(0);
+  </script>
+</body>
+</html>
